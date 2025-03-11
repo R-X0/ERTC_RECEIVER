@@ -91,46 +91,47 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
       });
     }
     
+    // Get the original data and formData
+    const originalData = submissionData.originalData || {};
+    const formData = originalData.formData || {};
+    
     // Add submission ID and timestamp
     summarySheet.addRow(['Submission ID', submissionId]);
     summarySheet.addRow(['Submission Date', submissionData.receivedAt]);
     summarySheet.addRow(['', '']); // Empty row
     
-    // Add each section of the form
-    const originalData = submissionData.originalData;
-    
     // Basic info section
     addSectionHeader(summarySheet, 'Basic Information');
-    if (originalData.userEmail) {
-      summarySheet.addRow(['Email', originalData.userEmail]);
+    if (formData.userEmail) {
+      summarySheet.addRow(['Email', formData.userEmail]);
     }
     summarySheet.addRow(['', '']); // Empty row
     
     // Qualifying Questions section
     addSectionHeader(summarySheet, 'Qualifying Questions');
-    if (originalData.qualifyingQuestions) {
-      addObjectRows(summarySheet, originalData.qualifyingQuestions);
+    if (formData.qualifyingQuestions) {
+      addObjectRows(summarySheet, formData.qualifyingQuestions);
     }
     summarySheet.addRow(['', '']); // Empty row
     
     // Business Challenges section
     addSectionHeader(summarySheet, 'Business Challenges');
-    if (originalData.businessChallenges) {
-      addObjectRows(summarySheet, originalData.businessChallenges);
+    if (formData.businessChallenges) {
+      addObjectRows(summarySheet, formData.businessChallenges);
     }
     summarySheet.addRow(['', '']); // Empty row
     
     // Requested Info section
     addSectionHeader(summarySheet, 'Requested Information');
-    if (originalData.requestedInfo) {
-      addObjectRows(summarySheet, originalData.requestedInfo);
+    if (formData.requestedInfo) {
+      addObjectRows(summarySheet, formData.requestedInfo);
     }
     summarySheet.addRow(['', '']); // Empty row
     
     // Ownership Structure section
     addSectionHeader(summarySheet, 'Ownership Structure');
-    if (originalData.ownershipStructure && originalData.ownershipStructure.length > 0) {
-      originalData.ownershipStructure.forEach((owner, index) => {
+    if (formData.ownershipStructure && formData.ownershipStructure.length > 0) {
+      formData.ownershipStructure.forEach((owner, index) => {
         summarySheet.addRow([`Owner #${index + 1} Name`, owner.owner_name]);
         summarySheet.addRow([`Owner #${index + 1} Percentage`, owner.ownership_percentage + '%']);
       });
@@ -141,10 +142,10 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
     
     // Relatives section
     addSectionHeader(summarySheet, 'Relatives');
-    if (originalData.relatives) {
-      summarySheet.addRow(['Has Relatives Working in Business', originalData.relatives.has_relatives]);
-      if (originalData.relatives.has_relatives === 'yes' && originalData.relatives.relative_rows) {
-        originalData.relatives.relative_rows.forEach((relative, index) => {
+    if (formData.relatives) {
+      summarySheet.addRow(['Has Relatives Working in Business', formData.relatives.has_relatives]);
+      if (formData.relatives.has_relatives === 'yes' && formData.relatives.relative_rows) {
+        formData.relatives.relative_rows.forEach((relative, index) => {
           summarySheet.addRow([`Relative #${index + 1} Name`, relative.relative_name]);
           summarySheet.addRow([`Relative #${index + 1} Relationship`, relative.relationship]);
         });
@@ -154,8 +155,8 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
     
     // Uploaded Files section
     addSectionHeader(summarySheet, 'Uploaded Files');
-    if (originalData.uploadedFiles) {
-      Object.entries(originalData.uploadedFiles).forEach(([fileCategory, files]) => {
+    if (formData.uploadedFiles) {
+      Object.entries(formData.uploadedFiles).forEach(([fileCategory, files]) => {
         if (files && files.length > 0) {
           summarySheet.addRow([fileCategory, `${files.length} file(s) uploaded`]);
           files.forEach((file, index) => {
@@ -195,7 +196,7 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
     analysisSheet.addRow(['', '', '', '', '', '']); // Empty row
     
     // Add data rows and calculate
-    const requestedInfo = originalData.requestedInfo || {};
+    const requestedInfo = formData.requestedInfo || {};
     const grossSales2019 = requestedInfo.gross_sales_2019 || {};
     const grossSales2021 = requestedInfo.gross_sales_2021 || {};
     

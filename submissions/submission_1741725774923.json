@@ -1,0 +1,133 @@
+{
+  "id": "1741725774923",
+  "receivedAt": "2025-03-11T20:42:54.924Z",
+  "originalData": {
+    "id": "1741725774060",
+    "timestamp": "2025-03-11T20:42:54.060Z",
+    "formData": {
+      "userEmail": "",
+      "qualifyingQuestions": {
+        "government_shutdowns": [
+          "q1_2021",
+          "q2_2021"
+        ],
+        "shutdown_standards": "cleaning and capacity limits",
+        "meetings_inability": [
+          "q1_2021",
+          "q2_2021"
+        ],
+        "supply_chain_disruption": [
+          "q1_2021",
+          "q2_2021",
+          "q3_2021"
+        ],
+        "supplier_delays": [
+          "q3_2021",
+          "q1_2021",
+          "q2_2021"
+        ],
+        "revenue_reduction": "not_sure",
+        "other_businesses": "no"
+      },
+      "businessChallenges": {
+        "full_shutdowns": "yes",
+        "partial_shutdowns": "yes",
+        "interrupted_operations": "yes",
+        "supply_chain_interruptions": "yes",
+        "inability_access_equipment": "yes",
+        "limited_capacity": "yes",
+        "inability_work_vendors": "yes",
+        "reduction_services": "yes",
+        "cut_hours": "yes",
+        "shift_hours_sanitation": "yes",
+        "employee_challenges": "yes",
+        "other_challenges": {
+          "selected": "no",
+          "text": ""
+        }
+      },
+      "requestedInfo": {
+        "gross_sales_2019": {
+          "q1": "100340",
+          "q2": "140304",
+          "q3": "200004"
+        },
+        "gross_sales_2021": {
+          "q3": "102304",
+          "q1": "143000",
+          "q2": "120004"
+        },
+        "ppp1_obtained": "yes",
+        "ppp1_forgiveness_amount": "279000",
+        "ppp2_obtained": "no"
+      },
+      "ownershipStructure": [
+        {
+          "id": 1741725716296,
+          "owner_name": "john derrick",
+          "ownership_percentage": "100"
+        }
+      ],
+      "relatives": {
+        "has_relatives": "yes",
+        "relative_rows": [
+          {
+            "id": 1741725749692,
+            "relative_name": "baby derrick",
+            "relationship": "son"
+          }
+        ]
+      },
+      "uploadedFiles": {
+        "quarterly_941_forms": [
+          {
+            "name": "PayrollReport-2ndQtr-2021.pdf",
+            "path": "/app/uploads/1741725773991/1741725773991-874232496-PayrollReport-2ndQtr-2021.pdf",
+            "size": 54816,
+            "mimetype": "application/pdf"
+          }
+        ],
+        "wages_by_period": [
+          {
+            "name": "2021-PayrollReport.pdf",
+            "path": "/app/uploads/1741725774036/1741725774037-893811799-2021-PayrollReport.pdf",
+            "size": 68267,
+            "mimetype": "application/pdf"
+          }
+        ]
+      }
+    },
+    "files": {
+      "quarterly_941_forms": [
+        {
+          "name": "PayrollReport-2ndQtr-2021.pdf",
+          "path": "/app/uploads/1741725773991/1741725773991-874232496-PayrollReport-2ndQtr-2021.pdf",
+          "size": 54816,
+          "mimetype": "application/pdf"
+        }
+      ],
+      "wages_by_period": [
+        {
+          "name": "2021-PayrollReport.pdf",
+          "path": "/app/uploads/1741725774036/1741725774037-893811799-2021-PayrollReport.pdf",
+          "size": 68267,
+          "mimetype": "application/pdf"
+        }
+      ]
+    }
+  },
+  "receivedFiles": [
+    {
+      "originalName": "PayrollReport-2ndQtr-2021.pdf",
+      "savedPath": "C:\\Users\\Bona\\Desktop\\ERTC_RECEIVER\\uploads\\1741725774905\\PayrollReport-2ndQtr-2021.pdf",
+      "size": 54816,
+      "mimetype": "application/pdf"
+    },
+    {
+      "originalName": "2021-PayrollReport.pdf",
+      "savedPath": "C:\\Users\\Bona\\Desktop\\ERTC_RECEIVER\\uploads\\1741725774919\\2021-PayrollReport.pdf",
+      "size": 68267,
+      "mimetype": "application/pdf"
+    }
+  ]
+}
