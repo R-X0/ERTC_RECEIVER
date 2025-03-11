@@ -3,12 +3,14 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const { generateExcelReport } = require('./excel-generator');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Create directories for storing submissions and files
+// Create directories for storing submissions, files, and reports
 const submissionsDir = path.join(__dirname, 'submissions');
 const uploadsDir = path.join(__dirname, 'uploads');
+const reportsDir = path.join(__dirname, 'reports');
 
 if (!fs.existsSync(submissionsDir)) {
   fs.mkdirSync(submissionsDir, { recursive: true });
@@ -16,6 +18,10 @@ if (!fs.existsSync(submissionsDir)) {
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+if (!fs.existsSync(reportsDir)) {
+  fs.mkdirSync(reportsDir, { recursive: true });
 }
 
 // Configure multer for file storage
@@ -44,7 +50,7 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // Webhook endpoint
-app.post('/webhook', upload.any(), (req, res) => {
+app.post('/webhook', upload.any(), async (req, res) => {
   try {
     console.log('Received webhook notification');
     
@@ -99,11 +105,21 @@ app.post('/webhook', upload.any(), (req, res) => {
     
     console.log(`Submission data saved to ${submissionFile}`);
     
+    // Generate Excel report
+    let reportPath = null;
+    try {
+      reportPath = await generateExcelReport(finalSubmissionData, submissionId, reportsDir);
+      console.log(`Excel report generated at ${reportPath}`);
+    } catch (reportError) {
+      console.error('Error generating Excel report:', reportError);
+    }
+    
     // Send confirmation response
     res.status(200).json({
       success: true,
       message: 'Webhook notification received and processed successfully',
-      submissionId: submissionId
+      submissionId: submissionId,
+      reportGenerated: !!reportPath
     });
   } catch (error) {
     console.error('Error processing webhook:', error);
@@ -130,10 +146,15 @@ app.get('/submissions', (req, res) => {
         const filePath = path.join(submissionsDir, file);
         try {
           const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          const id = data.id || file.replace('submission_', '').replace('.json', '');
+          const reportPath = path.join(reportsDir, `report_${id}.xlsx`);
+          const hasReport = fs.existsSync(reportPath);
+          
           return {
-            id: data.id || file.replace('submission_', '').replace('.json', ''),
+            id,
             receivedAt: data.receivedAt,
             fileCount: (data.receivedFiles || []).length,
+            hasReport,
             filePath
           };
         } catch (e) {
@@ -154,6 +175,9 @@ app.get('/submissions', (req, res) => {
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             tr:nth-child(even) { background-color: #f2f2f2; }
             th { background-color: #4CAF50; color: white; }
+            .btn { padding: 5px 10px; text-decoration: none; color: white; border-radius: 4px; display: inline-block; margin-right: 5px; }
+            .btn-primary { background-color: #4CAF50; }
+            .btn-secondary { background-color: #2196F3; }
           </style>
         </head>
         <body>
@@ -171,7 +195,10 @@ app.get('/submissions', (req, res) => {
                 <td>${sub.id}</td>
                 <td>${sub.receivedAt || 'N/A'}</td>
                 <td>${sub.fileCount || 0} files</td>
-                <td><a href="/submission/${sub.id}">View Details</a></td>
+                <td>
+                  <a href="/submission/${sub.id}" class="btn btn-primary">View Details</a>
+                  ${sub.hasReport ? `<a href="/download-report/${sub.id}" class="btn btn-secondary">Download Excel</a>` : ''}
+                </td>
               </tr>
             `).join('')}
           </table>
@@ -180,6 +207,20 @@ app.get('/submissions', (req, res) => {
     `);
   } catch (error) {
     res.status(500).send(`Error listing submissions: ${error.message}`);
+  }
+});
+
+// Add a route to download the Excel report
+app.get('/download-report/:id', (req, res) => {
+  try {
+    const reportPath = path.join(reportsDir, `report_${req.params.id}.xlsx`);
+    if (!fs.existsSync(reportPath)) {
+      return res.status(404).send('Excel report not found');
+    }
+    
+    res.download(reportPath, `ERTC_Report_${req.params.id}.xlsx`);
+  } catch (error) {
+    res.status(500).send(`Error downloading report: ${error.message}`);
   }
 });
 
@@ -192,6 +233,8 @@ app.get('/submission/:id', (req, res) => {
     }
     
     const submissionData = JSON.parse(fs.readFileSync(submissionFile, 'utf8'));
+    const reportPath = path.join(reportsDir, `report_${req.params.id}.xlsx`);
+    const hasReport = fs.existsSync(reportPath);
     
     res.send(`
       <html>
@@ -202,11 +245,17 @@ app.get('/submission/:id', (req, res) => {
             pre { background-color: #f5f5f5; padding: 1rem; overflow: auto; }
             .files { margin-top: 2rem; }
             .file-item { margin-bottom: 1rem; padding: 0.5rem; border: 1px solid #ddd; }
+            .btn { padding: 10px 15px; text-decoration: none; color: white; background-color: #4CAF50; border-radius: 4px; display: inline-block; margin-right: 10px; }
+            .btn-secondary { background-color: #2196F3; }
           </style>
         </head>
         <body>
           <h1>Submission Details: ${req.params.id}</h1>
-          <a href="/submissions">← Back to all submissions</a>
+          
+          <div style="margin: 20px 0;">
+            <a href="/submissions" class="btn">← Back to all submissions</a>
+            ${hasReport ? `<a href="/download-report/${req.params.id}" class="btn btn-secondary">Download Excel Report</a>` : ''}
+          </div>
           
           <h2>Received At</h2>
           <p>${submissionData.receivedAt}</p>
@@ -251,12 +300,14 @@ app.get('/', (req, res) => {
           <div class="status">
             <h1>ERTC Form Webhook Receiver is running</h1>
             <p>This server is ready to receive webhook notifications from your ERTC Form application.</p>
+            <p>Now with automatic Excel report generation!</p>
           </div>
           <div>
             <h2>Server Information</h2>
             <p>Webhook endpoint: <code>http://localhost:${PORT}/webhook</code></p>
             <p>Submissions saved to: <code>${submissionsDir}</code></p>
             <p>Uploaded files saved to: <code>${uploadsDir}</code></p>
+            <p>Excel reports saved to: <code>${reportsDir}</code></p>
           </div>
           <a href="/submissions">View Submissions</a>
         </div>
@@ -271,4 +322,5 @@ app.listen(PORT, () => {
   console.log(`Webhook endpoint: http://localhost:${PORT}/webhook`);
   console.log(`Submissions will be saved to: ${submissionsDir}`);
   console.log(`Uploaded files will be saved to: ${uploadsDir}`);
+  console.log(`Excel reports will be saved to: ${reportsDir}`);
 });

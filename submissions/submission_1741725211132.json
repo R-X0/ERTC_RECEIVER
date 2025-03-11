@@ -1,0 +1,133 @@
+{
+  "id": "1741725211132",
+  "receivedAt": "2025-03-11T20:33:31.133Z",
+  "originalData": {
+    "id": "1741725208841",
+    "timestamp": "2025-03-11T20:33:28.841Z",
+    "formData": {
+      "userEmail": "",
+      "qualifyingQuestions": {
+        "government_shutdowns": [
+          "q1_2021"
+        ],
+        "shutdown_standards": "132123",
+        "meetings_inability": [
+          "q1_2021"
+        ],
+        "supply_chain_disruption": [
+          "q1_2021"
+        ],
+        "supplier_delays": [
+          "q1_2021"
+        ],
+        "revenue_reduction": "yes",
+        "other_businesses": "yes"
+      },
+      "businessChallenges": {
+        "full_shutdowns": "yes",
+        "partial_shutdowns": "yes",
+        "interrupted_operations": "yes",
+        "supply_chain_interruptions": "yes",
+        "inability_access_equipment": "yes",
+        "limited_capacity": "yes",
+        "inability_work_vendors": "yes",
+        "reduction_services": "yes",
+        "cut_hours": "yes",
+        "shift_hours_sanitation": "yes",
+        "employee_challenges": "yes",
+        "other_challenges": {
+          "selected": "yes",
+          "text": "we beat ukraine"
+        }
+      },
+      "requestedInfo": {
+        "gross_sales_2019": {
+          "q1": "345123",
+          "q2": "564367",
+          "q3": "123521"
+        },
+        "gross_sales_2021": {
+          "q1": "6237543",
+          "q2": "1234234",
+          "q3": "21365123"
+        },
+        "ppp1_obtained": "yes",
+        "ppp1_forgiveness_amount": "123141",
+        "ppp2_obtained": "yes",
+        "ppp2_forgiveness_amount": "653246"
+      },
+      "ownershipStructure": [
+        {
+          "id": 1741725183927,
+          "owner_name": "Elden",
+          "ownership_percentage": "5"
+        },
+        {
+          "id": 1741725187897,
+          "ownership_percentage": "95",
+          "owner_name": "Beatrice"
+        }
+      ],
+      "relatives": {
+        "has_relatives": "yes",
+        "relative_rows": [
+          {
+            "id": 1741725192541,
+            "relative_name": "Mike",
+            "relationship": "Brother"
+          }
+        ]
+      },
+      "uploadedFiles": {
+        "quarterly_941_forms": [
+          {
+            "name": "Merchant-Statement-Example-Format (2).pdf",
+            "path": "/app/uploads/1741725203898/1741725203899-998275553-Merchant-Statement-Example-Format (2).pdf",
+            "size": 9035753,
+            "mimetype": "application/pdf"
+          }
+        ],
+        "wages_by_period": [
+          {
+            "name": "Merchant-Statement-Example-Format (2).pdf",
+            "path": "/app/uploads/1741725207387/1741725207387-482787452-Merchant-Statement-Example-Format (2).pdf",
+            "size": 9035753,
+            "mimetype": "application/pdf"
+          }
+        ]
+      }
+    },
+    "files": {
+      "quarterly_941_forms": [
+        {
+          "name": "Merchant-Statement-Example-Format (2).pdf",
+          "path": "/app/uploads/1741725203898/1741725203899-998275553-Merchant-Statement-Example-Format (2).pdf",
+          "size": 9035753,
+          "mimetype": "application/pdf"
+        }
+      ],
+      "wages_by_period": [
+        {
+          "name": "Merchant-Statement-Example-Format (2).pdf",
+          "path": "/app/uploads/1741725207387/1741725207387-482787452-Merchant-Statement-Example-Format (2).pdf",
+          "size": 9035753,
+          "mimetype": "application/pdf"
+        }
+      ]
+    }
+  },
+  "receivedFiles": [
+    {
+      "originalName": "Merchant-Statement-Example-Format (2).pdf",
+      "savedPath": "C:\\Users\\Bona\\Desktop\\ERTC_RECEIVER\\uploads\\1741725209677\\Merchant-Statement-Example-Format (2).pdf",
+      "size": 9035753,
+      "mimetype": "application/pdf"
+    },
+    {
+      "originalName": "Merchant-Statement-Example-Format (2).pdf",
+      "savedPath": "C:\\Users\\Bona\\Desktop\\ERTC_RECEIVER\\uploads\\1741725210455\\Merchant-Statement-Example-Format (2).pdf",
+      "size": 9035753,
+      "mimetype": "application/pdf"
+    }
+  ]
+}
