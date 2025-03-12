@@ -1,0 +1,133 @@
+{
+  "id": "1741816516425",
+  "receivedAt": "2025-03-12T21:55:16.425Z",
+  "originalData": {
+    "id": "1741816516348",
+    "timestamp": "2025-03-12T21:55:16.348Z",
+    "formData": {
+      "userEmail": "mike@mike.com",
+      "qualifyingQuestions": {
+        "government_shutdowns": [
+          "q1_2021"
+        ],
+        "shutdown_standards": "43213",
+        "meetings_inability": [
+          "q1_2021"
+        ],
+        "supply_chain_disruption": [
+          "q1_2021"
+        ],
+        "supplier_delays": [
+          "q1_2021"
+        ],
+        "revenue_reduction": "yes",
+        "other_businesses": "yes"
+      },
+      "businessChallenges": {
+        "full_shutdowns": "yes",
+        "partial_shutdowns": "yes",
+        "interrupted_operations": "yes",
+        "supply_chain_interruptions": "yes",
+        "inability_access_equipment": "yes",
+        "limited_capacity": "yes",
+        "inability_work_vendors": "yes",
+        "reduction_services": "yes",
+        "cut_hours": "yes",
+        "shift_hours_sanitation": "yes",
+        "employee_challenges": "yes",
+        "other_challenges": {
+          "selected": "yes",
+          "text": "342"
+        }
+      },
+      "requestedInfo": {
+        "gross_sales_2019": {
+          "q1": "3412",
+          "q2": "342",
+          "q3": "452345"
+        },
+        "gross_sales_2021": {
+          "q1": "52345",
+          "q2": "234523",
+          "q3": "453245"
+        },
+        "ppp1_obtained": "yes",
+        "ppp1_forgiveness_amount": "52345234",
+        "ppp2_obtained": "yes",
+        "ppp2_forgiveness_amount": "43252345"
+      },
+      "ownershipStructure": [
+        {
+          "id": 1741816501930,
+          "owner_name": "45",
+          "ownership_percentage": "4"
+        },
+        {
+          "id": 1741816504193,
+          "ownership_percentage": "96",
+          "owner_name": "53"
+        }
+      ],
+      "relatives": {
+        "has_relatives": "yes",
+        "relative_rows": [
+          {
+            "id": 1741816506430,
+            "relative_name": "45",
+            "relationship": "4"
+          }
+        ]
+      },
+      "uploadedFiles": {
+        "quarterly_941_forms": [
+          {
+            "name": "filled_form2848.pdf",
+            "path": "/app/uploads/mike@mike.com/1741816516091-749094559-filled_form2848.pdf",
+            "size": 153106,
+            "mimetype": "application/pdf"
+          }
+        ],
+        "wages_by_period": [
+          {
+            "name": "form2848.pdf",
+            "path": "/app/uploads/mike@mike.com/1741816516239-152236644-form2848.pdf",
+            "size": 142587,
+            "mimetype": "application/pdf"
+          }
+        ]
+      }
+    },
+    "files": {
+      "quarterly_941_forms": [
+        {
+          "name": "filled_form2848.pdf",
+          "path": "/app/uploads/mike@mike.com/1741816516091-749094559-filled_form2848.pdf",
+          "size": 153106,
+          "mimetype": "application/pdf"
+        }
+      ],
+      "wages_by_period": [
+        {
+          "name": "form2848.pdf",
+          "path": "/app/uploads/mike@mike.com/1741816516239-152236644-form2848.pdf",
+          "size": 142587,
+          "mimetype": "application/pdf"
+        }
+      ]
+    }
+  },
+  "receivedFiles": [
+    {
+      "originalName": "filled_form2848.pdf",
+      "savedPath": "C:\\Users\\Bona\\Desktop\\ERTC_RECEIVER\\uploads\\1741816516374\\filled_form2848.pdf",
+      "size": 153106,
+      "mimetype": "application/pdf"
+    },
+    {
+      "originalName": "form2848.pdf",
+      "savedPath": "C:\\Users\\Bona\\Desktop\\ERTC_RECEIVER\\uploads\\1741816516422\\form2848.pdf",
+      "size": 142587,
+      "mimetype": "application/pdf"
+    }
+  ]
+}
