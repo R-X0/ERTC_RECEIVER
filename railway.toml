@@ -1,0 +1,14 @@
+[build]
+builder = "NIXPACKS"
+watchPatterns = ["webhook-receiver.js", "excel-generator.js"]
+
+[deploy]
+startCommand = "node webhook-receiver.js"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[environments]
+  [environments.production]
+    numReplicas = 1

@@ -3,9 +3,14 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
+const FormData = require('form-data');
 const { generateExcelReport } = require('./excel-generator');
 const app = express();
 const PORT = process.env.PORT || 8000;
+
+// Outbound webhook configuration
+const FORWARD_WEBHOOK_URL = process.env.FORWARD_WEBHOOK_URL || '';
 
 // Create directories for storing submissions, files, and reports
 const submissionsDir = path.join(__dirname, 'submissions');
@@ -48,6 +53,65 @@ const upload = multer({ storage: storage });
 // Configure express middleware
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+
+// Function to forward submission data, files and report to another service
+async function forwardSubmissionData(submissionData, receivedFiles, reportPath) {
+  if (!FORWARD_WEBHOOK_URL) {
+    console.log('No forward webhook URL configured, skipping outbound data forwarding');
+    return { success: false, message: 'No forward webhook URL configured' };
+  }
+
+  try {
+    console.log(`Forwarding submission data to ${FORWARD_WEBHOOK_URL}`);
+    
+    const form = new FormData();
+    
+    // Add the JSON data
+    form.append('submissionData', JSON.stringify(submissionData));
+    
+    // Add the received files
+    if (receivedFiles && receivedFiles.length > 0) {
+      receivedFiles.forEach((file, index) => {
+        if (fs.existsSync(file.savedPath)) {
+          const fileStream = fs.createReadStream(file.savedPath);
+          form.append(`uploadedFile_${index}`, fileStream, {
+            filename: file.originalName,
+            contentType: file.mimetype
+          });
+        }
+      });
+    }
+    
+    // Add the Excel report if available
+    if (reportPath && fs.existsSync(reportPath)) {
+      const reportStream = fs.createReadStream(reportPath);
+      form.append('excelReport', reportStream, {
+        filename: path.basename(reportPath),
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+    }
+    
+    // Set headers for the request
+    const headers = form.getHeaders();
+    
+    // Send the request
+    const response = await axios.post(FORWARD_WEBHOOK_URL, form, { headers });
+    
+    console.log('Data forwarding successful:', response.status, response.statusText);
+    return { 
+      success: true, 
+      status: response.status,
+      message: 'Data forwarded successfully'
+    };
+  } catch (error) {
+    console.error('Error forwarding submission data:', error.message);
+    return { 
+      success: false, 
+      error: error.message,
+      message: 'Error forwarding submission data'
+    };
+  }
+}
 
 // Webhook endpoint
 app.post('/webhook', upload.any(), async (req, res) => {
@@ -114,12 +178,27 @@ app.post('/webhook', upload.any(), async (req, res) => {
       console.error('Error generating Excel report:', reportError);
     }
     
+    // Forward the submission data, files, and report
+    let forwardingResult = { success: false, message: 'Forwarding not attempted' };
+    try {
+      forwardingResult = await forwardSubmissionData(finalSubmissionData, receivedFiles, reportPath);
+    } catch (forwardError) {
+      console.error('Error in forwarding process:', forwardError);
+      forwardingResult = { 
+        success: false, 
+        error: forwardError.message,
+        message: 'Error in forwarding process'
+      };
+    }
+    
     // Send confirmation response
     res.status(200).json({
       success: true,
       message: 'Webhook notification received and processed successfully',
       submissionId: submissionId,
-      reportGenerated: !!reportPath
+      reportGenerated: !!reportPath,
+      forwarded: forwardingResult.success,
+      forwardingDetails: forwardingResult
     });
   } catch (error) {
     console.error('Error processing webhook:', error);
@@ -135,7 +214,8 @@ app.post('/webhook', upload.any(), async (req, res) => {
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'ERTC Form Webhook Receiver is running',
-    message: 'Ready to receive webhook notifications'
+    message: 'Ready to receive webhook notifications',
+    forwardingConfigured: !!FORWARD_WEBHOOK_URL
   });
 });
 
@@ -146,4 +226,5 @@ app.listen(PORT, () => {
   console.log(`Submissions will be saved to: ${submissionsDir}`);
   console.log(`Uploaded files will be saved to: ${uploadsDir}`);
   console.log(`Excel reports will be saved to: ${reportsDir}`);
+  console.log(`Forwarding webhook configured: ${!!FORWARD_WEBHOOK_URL}`);
 });
