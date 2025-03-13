@@ -1,33 +1,25 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
-const FormData = require('form-data');
 const { generateExcelReport } = require('./excel-generator');
+const { connectToDatabase, Submission } = require('./db-connection');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Outbound webhook configuration
-const FORWARD_WEBHOOK_URL = process.env.FORWARD_WEBHOOK_URL || '';
-
-// Create directories for storing submissions, files, and reports
+// Create directories for storing files and reports
 const submissionsDir = path.join(__dirname, 'submissions');
 const uploadsDir = path.join(__dirname, 'uploads');
 const reportsDir = path.join(__dirname, 'reports');
 
-if (!fs.existsSync(submissionsDir)) {
-  fs.mkdirSync(submissionsDir, { recursive: true });
-}
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-if (!fs.existsSync(reportsDir)) {
-  fs.mkdirSync(reportsDir, { recursive: true });
-}
+// Ensure directories exist
+[submissionsDir, uploadsDir, reportsDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
 // Configure multer for file storage
 const storage = multer.diskStorage({
@@ -54,64 +46,12 @@ const upload = multer({ storage: storage });
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
-// Function to forward submission data, files and report to another service
-async function forwardSubmissionData(submissionData, receivedFiles, reportPath) {
-  if (!FORWARD_WEBHOOK_URL) {
-    console.log('No forward webhook URL configured, skipping outbound data forwarding');
-    return { success: false, message: 'No forward webhook URL configured' };
+// Connect to MongoDB when the server starts
+connectToDatabase().then(connected => {
+  if (!connected) {
+    console.error('Failed to connect to MongoDB. The server will continue, but data won\'t be stored in MongoDB.');
   }
-
-  try {
-    console.log(`Forwarding submission data to ${FORWARD_WEBHOOK_URL}`);
-    
-    const form = new FormData();
-    
-    // Add the JSON data
-    form.append('submissionData', JSON.stringify(submissionData));
-    
-    // Add the received files
-    if (receivedFiles && receivedFiles.length > 0) {
-      receivedFiles.forEach((file, index) => {
-        if (fs.existsSync(file.savedPath)) {
-          const fileStream = fs.createReadStream(file.savedPath);
-          form.append(`uploadedFile_${index}`, fileStream, {
-            filename: file.originalName,
-            contentType: file.mimetype
-          });
-        }
-      });
-    }
-    
-    // Add the Excel report if available
-    if (reportPath && fs.existsSync(reportPath)) {
-      const reportStream = fs.createReadStream(reportPath);
-      form.append('excelReport', reportStream, {
-        filename: path.basename(reportPath),
-        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-    }
-    
-    // Set headers for the request
-    const headers = form.getHeaders();
-    
-    // Send the request
-    const response = await axios.post(FORWARD_WEBHOOK_URL, form, { headers });
-    
-    console.log('Data forwarding successful:', response.status, response.statusText);
-    return { 
-      success: true, 
-      status: response.status,
-      message: 'Data forwarded successfully'
-    };
-  } catch (error) {
-    console.error('Error forwarding submission data:', error.message);
-    return { 
-      success: false, 
-      error: error.message,
-      message: 'Error forwarding submission data'
-    };
-  }
-}
+});
 
 // Webhook endpoint
 app.post('/webhook', upload.any(), async (req, res) => {
@@ -163,10 +103,9 @@ app.post('/webhook', upload.any(), async (req, res) => {
       receivedFiles: receivedFiles
     };
     
-    // Save submission data to a JSON file
+    // Save submission data to a JSON file (keeping this for backward compatibility)
     const submissionFile = path.join(submissionsDir, `submission_${submissionId}.json`);
     fs.writeFileSync(submissionFile, JSON.stringify(finalSubmissionData, null, 2));
-    
     console.log(`Submission data saved to ${submissionFile}`);
     
     // Generate Excel report
@@ -178,16 +117,58 @@ app.post('/webhook', upload.any(), async (req, res) => {
       console.error('Error generating Excel report:', reportError);
     }
     
-    // Forward the submission data, files, and report
-    let forwardingResult = { success: false, message: 'Forwarding not attempted' };
+    // Store in MongoDB
+    let mongoResult = { success: false, message: 'MongoDB storage not attempted' };
     try {
-      forwardingResult = await forwardSubmissionData(finalSubmissionData, receivedFiles, reportPath);
-    } catch (forwardError) {
-      console.error('Error in forwarding process:', forwardError);
-      forwardingResult = { 
-        success: false, 
-        error: forwardError.message,
-        message: 'Error in forwarding process'
+      // Extract user information for better organization
+      let userEmail = null;
+      let userId = null;
+      
+      // Try to get the user email from the submission data
+      if (parsedData.formData && parsedData.formData.userEmail) {
+        userEmail = parsedData.formData.userEmail;
+      } else if (parsedData.originalData && parsedData.originalData.formData && parsedData.originalData.formData.userEmail) {
+        userEmail = parsedData.originalData.formData.userEmail;
+      }
+      
+      // Use a unique ID from the data if available, or generate one
+      if (parsedData.id) {
+        userId = parsedData.id;
+      } else if (parsedData.originalData && parsedData.originalData.id) {
+        userId = parsedData.originalData.id;
+      } else {
+        // If no user ID is available, use the submission ID
+        userId = submissionId;
+      }
+      
+      // Create a new submission document
+      const submission = new Submission({
+        submissionId: submissionId,
+        userId: userId,
+        userEmail: userEmail,
+        receivedAt: new Date(),
+        originalData: parsedData,
+        receivedFiles: receivedFiles,
+        report: {
+          generated: !!reportPath,
+          path: reportPath
+        }
+      });
+      
+      // Save to MongoDB
+      await submission.save();
+      console.log(`Submission data saved to MongoDB with ID: ${submissionId}`);
+      mongoResult = {
+        success: true,
+        message: 'Data saved to MongoDB successfully',
+        submissionId: submissionId
+      };
+    } catch (mongoError) {
+      console.error('Error saving to MongoDB:', mongoError);
+      mongoResult = {
+        success: false,
+        error: mongoError.message,
+        message: 'Error saving data to MongoDB'
       };
     }
     
@@ -197,8 +178,8 @@ app.post('/webhook', upload.any(), async (req, res) => {
       message: 'Webhook notification received and processed successfully',
       submissionId: submissionId,
       reportGenerated: !!reportPath,
-      forwarded: forwardingResult.success,
-      forwardingDetails: forwardingResult
+      mongoDbStorage: mongoResult.success,
+      mongoDetails: mongoResult
     });
   } catch (error) {
     console.error('Error processing webhook:', error);
@@ -210,12 +191,84 @@ app.post('/webhook', upload.any(), async (req, res) => {
   }
 });
 
+// Add a route to get submissions for a specific user
+app.get('/submissions/:userEmail', async (req, res) => {
+  try {
+    const userEmail = req.params.userEmail;
+    
+    if (!userEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'User email is required'
+      });
+    }
+    
+    // Find all submissions for this user
+    const submissions = await Submission.find({ userEmail: userEmail })
+      .select('submissionId receivedAt originalData.formData.qualifyingQuestions report.generated')
+      .sort({ receivedAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: submissions.length,
+      submissions: submissions
+    });
+  } catch (error) {
+    console.error('Error retrieving submissions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving submissions',
+      error: error.message
+    });
+  }
+});
+
+// Add a route to get a specific submission
+app.get('/submission/:submissionId', async (req, res) => {
+  try {
+    const submissionId = req.params.submissionId;
+    
+    if (!submissionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Submission ID is required'
+      });
+    }
+    
+    // Find the submission
+    const submission = await Submission.findOne({ submissionId: submissionId });
+    
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'Submission not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      submission: submission
+    });
+  } catch (error) {
+    console.error('Error retrieving submission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving submission',
+      error: error.message
+    });
+  }
+});
+
 // Simple health check endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
-    status: 'ERTC Form Webhook Receiver is running',
+    status: 'ERTC Form Webhook Receiver is running with MongoDB storage',
     message: 'Ready to receive webhook notifications',
-    forwardingConfigured: !!FORWARD_WEBHOOK_URL
+    features: {
+      fileStorage: true,
+      excelReports: true,
+      mongoDbStorage: true
+    }
   });
 });
 
@@ -226,5 +279,4 @@ app.listen(PORT, () => {
   console.log(`Submissions will be saved to: ${submissionsDir}`);
   console.log(`Uploaded files will be saved to: ${uploadsDir}`);
   console.log(`Excel reports will be saved to: ${reportsDir}`);
-  console.log(`Forwarding webhook configured: ${!!FORWARD_WEBHOOK_URL}`);
 });
