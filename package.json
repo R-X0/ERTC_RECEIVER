@@ -8,7 +8,7 @@
         "dev": "nodemon webhook-receiver.js"
     },
     "dependencies": {
-        "axios": "",
+        "axios": "^1.8.3",
         "body-parser": "",
         "exceljs": "",
         "express": "",
