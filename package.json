@@ -10,6 +10,7 @@
     "dependencies": {
         "axios": "",
         "body-parser": "",
+        "dotenv": "^16.4.7",
         "exceljs": "",
         "express": "",
         "form-data": "",
