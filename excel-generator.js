@@ -7,7 +7,7 @@ const path = require('path');
  * @param {Object} submissionData - The submission data
  * @param {String} submissionId - The submission ID
  * @param {String} reportsDir - Directory to save the report
- * @returns {Promise<String>} - Path to the generated Excel file
+ * @returns {Promise<Object>} - Object with report path and qualification data
  */
 async function generateExcelReport(submissionData, submissionId, reportsDir) {
   try {
@@ -273,12 +273,37 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
       };
     }
     
+    // Create quarter analysis data for MongoDB
+    const quarterAnalysis = quarters.map((q, index) => {
+      const row = analysisSheet.getRow(index + 8); // Starting from row 8
+      const percentDecreaseText = row.getCell(5).value;
+      const percentDecreaseValue = parseFloat(percentDecreaseText.replace('%', ''));
+      
+      return {
+        quarter: `Quarter ${q.toUpperCase().replace('Q', '')}`,
+        revenues: {
+          revenue2019: parseFloat(grossSales2019[q]) || 0,
+          revenue2021: parseFloat(grossSales2021[q]) || 0
+        },
+        change: parseFloat(grossSales2019[q] || 0) - parseFloat(grossSales2021[q] || 0),
+        percentDecrease: percentDecreaseValue,
+        qualifies: row.getCell(6).value === 'Yes'
+      };
+    });
+    
     // Save the workbook
     const reportPath = path.join(reportsDir, `report_${submissionId}.xlsx`);
     await workbook.xlsx.writeFile(reportPath);
     console.log(`Excel report saved to ${reportPath}`);
     
-    return reportPath;
+    // Return both the report path and qualification data
+    return {
+      reportPath,
+      qualificationData: {
+        qualifyingQuarters,
+        quarterAnalysis
+      }
+    };
   } catch (error) {
     console.error('Error generating Excel report:', error);
     throw error;

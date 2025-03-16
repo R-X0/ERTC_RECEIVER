@@ -108,11 +108,17 @@ app.post('/webhook', upload.any(), async (req, res) => {
     fs.writeFileSync(submissionFile, JSON.stringify(finalSubmissionData, null, 2));
     console.log(`Submission data saved to ${submissionFile}`);
     
-    // Generate Excel report
+    // Generate Excel report with qualification data
     let reportPath = null;
+    let qualificationData = null;
     try {
-      reportPath = await generateExcelReport(finalSubmissionData, submissionId, reportsDir);
+      const reportResult = await generateExcelReport(finalSubmissionData, submissionId, reportsDir);
+      reportPath = reportResult.reportPath;
+      qualificationData = reportResult.qualificationData;
       console.log(`Excel report generated at ${reportPath}`);
+      if (qualificationData && qualificationData.qualifyingQuarters) {
+        console.log(`Qualifying quarters: ${qualificationData.qualifyingQuarters.join(', ') || 'None'}`);
+      }
     } catch (reportError) {
       console.error('Error generating Excel report:', reportError);
     }
@@ -141,7 +147,7 @@ app.post('/webhook', upload.any(), async (req, res) => {
         userId = submissionId;
       }
       
-      // Create a new submission document
+      // Create a new submission document with qualification data
       const submission = new Submission({
         submissionId: submissionId,
         userId: userId,
@@ -151,7 +157,8 @@ app.post('/webhook', upload.any(), async (req, res) => {
         receivedFiles: receivedFiles,
         report: {
           generated: !!reportPath,
-          path: reportPath
+          path: reportPath,
+          qualificationData: qualificationData
         }
       });
       
@@ -172,14 +179,16 @@ app.post('/webhook', upload.any(), async (req, res) => {
       };
     }
     
-    // Send confirmation response
+    // Send confirmation response with qualification data
     res.status(200).json({
       success: true,
       message: 'Webhook notification received and processed successfully',
       submissionId: submissionId,
       reportGenerated: !!reportPath,
       mongoDbStorage: mongoResult.success,
-      mongoDetails: mongoResult
+      mongoDetails: mongoResult,
+      // Include qualifying quarters information if available
+      qualifyingQuarters: qualificationData?.qualifyingQuarters || []
     });
   } catch (error) {
     console.error('Error processing webhook:', error);
@@ -203,9 +212,9 @@ app.get('/submissions/:userEmail', async (req, res) => {
       });
     }
     
-    // Find all submissions for this user
+    // Find all submissions for this user, now including qualification data
     const submissions = await Submission.find({ userEmail: userEmail })
-      .select('submissionId receivedAt originalData.formData.qualifyingQuestions report.generated')
+      .select('submissionId receivedAt originalData.formData.qualifyingQuestions report.generated report.qualificationData')
       .sort({ receivedAt: -1 });
     
     res.status(200).json({
@@ -267,7 +276,8 @@ app.get('/', (req, res) => {
     features: {
       fileStorage: true,
       excelReports: true,
-      mongoDbStorage: true
+      mongoDbStorage: true,
+      qualificationData: true // Adding this feature flag to indicate support for qualification data
     }
   });
 });
