@@ -273,11 +273,33 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
       };
     }
     
-    // Create quarter analysis data for MongoDB
+    // Create quarter analysis data for MongoDB with proper null checking
     const quarterAnalysis = quarters.map((q, index) => {
       const row = analysisSheet.getRow(index + 8); // Starting from row 8
+      
+      // Handle null values properly
+      let percentDecreaseValue = 0;
       const percentDecreaseText = row.getCell(5).value;
-      const percentDecreaseValue = parseFloat(percentDecreaseText.replace('%', ''));
+      
+      // Safely extract the percentage value
+      if (percentDecreaseText) {
+        // If it's a string with a % symbol
+        if (typeof percentDecreaseText === 'string' && percentDecreaseText.includes('%')) {
+          percentDecreaseValue = parseFloat(percentDecreaseText.replace('%', ''));
+        } 
+        // If it's already a number
+        else if (typeof percentDecreaseText === 'number') {
+          percentDecreaseValue = percentDecreaseText;
+        }
+        // Otherwise try to parse it directly
+        else {
+          try {
+            percentDecreaseValue = parseFloat(percentDecreaseText);
+          } catch (e) {
+            percentDecreaseValue = 0;
+          }
+        }
+      }
       
       return {
         quarter: `Quarter ${q.toUpperCase().replace('Q', '')}`,
@@ -286,7 +308,7 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
           revenue2021: parseFloat(grossSales2021[q]) || 0
         },
         change: parseFloat(grossSales2019[q] || 0) - parseFloat(grossSales2021[q] || 0),
-        percentDecrease: percentDecreaseValue,
+        percentDecrease: percentDecreaseValue || 0,
         qualifies: row.getCell(6).value === 'Yes'
       };
     });
