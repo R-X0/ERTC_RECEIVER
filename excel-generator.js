@@ -1,15 +1,15 @@
 const ExcelJS = require('exceljs');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
+const { GridFSBucket } = require('mongodb');
+const stream = require('stream');
 
 /**
- * Generates an Excel report for a form submission
+ * Generates an Excel report for a form submission and stores it in MongoDB GridFS
  * @param {Object} submissionData - The submission data
  * @param {String} submissionId - The submission ID
- * @param {String} reportsDir - Directory to save the report
- * @returns {Promise<Object>} - Object with report path and qualification data
+ * @returns {Promise<Object>} - Object with GridFS file ID and qualification data
  */
-async function generateExcelReport(submissionData, submissionId, reportsDir) {
+async function generateExcelReport(submissionData, submissionId) {
   try {
     console.log(`Generating Excel report for submission ${submissionId}`);
     
@@ -312,20 +312,54 @@ async function generateExcelReport(submissionData, submissionId, reportsDir) {
         qualifies: row.getCell(6).value === 'Yes'
       };
     });
+
+    // Now, instead of saving to disk, we'll store it in MongoDB using GridFS
+    // First, write to a buffer instead of a file
+    const buffer = await workbook.xlsx.writeBuffer();
     
-    // Save the workbook
-    const reportPath = path.join(reportsDir, `report_${submissionId}.xlsx`);
-    await workbook.xlsx.writeFile(reportPath);
-    console.log(`Excel report saved to ${reportPath}`);
+    // Get GridFS bucket
+    const bucket = new GridFSBucket(mongoose.connection.db, {
+      bucketName: 'excelReports'
+    });
     
-    // Return both the report path and qualification data
-    return {
-      reportPath,
-      qualificationData: {
-        qualifyingQuarters,
-        quarterAnalysis
-      }
-    };
+    // Create a readable stream from the buffer
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(buffer);
+    
+    // Create a filename
+    const filename = `report_${submissionId}.xlsx`;
+    
+    // Upload the file to GridFS
+    return new Promise((resolve, reject) => {
+      const uploadStream = bucket.openUploadStream(filename, {
+        metadata: {
+          submissionId,
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          createdAt: new Date()
+        }
+      });
+      
+      bufferStream.pipe(uploadStream);
+      
+      uploadStream.on('error', (error) => {
+        console.error('Error uploading Excel to GridFS:', error);
+        reject(error);
+      });
+      
+      uploadStream.on('finish', (file) => {
+        console.log(`Excel report saved to GridFS with ID: ${file._id}`);
+        
+        // Return both the file ID and qualification data
+        resolve({
+          fileId: file._id,
+          filename,
+          qualificationData: {
+            qualifyingQuarters,
+            quarterAnalysis
+          }
+        });
+      });
+    });
   } catch (error) {
     console.error('Error generating Excel report:', error);
     throw error;

@@ -12,10 +12,9 @@ const PORT = process.env.PORT || 8000;
 // Create directories for storing files and reports
 const submissionsDir = path.join(__dirname, 'submissions');
 const uploadsDir = path.join(__dirname, 'uploads');
-const reportsDir = path.join(__dirname, 'reports');
 
 // Ensure directories exist
-[submissionsDir, uploadsDir, reportsDir].forEach(dir => {
+[submissionsDir, uploadsDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -108,14 +107,17 @@ app.post('/webhook', upload.any(), async (req, res) => {
     fs.writeFileSync(submissionFile, JSON.stringify(finalSubmissionData, null, 2));
     console.log(`Submission data saved to ${submissionFile}`);
     
-    // Generate Excel report with qualification data
-    let reportPath = null;
+    // Generate Excel report and store in MongoDB GridFS
+    let fileId = null;
+    let filename = null;
     let qualificationData = null;
     try {
-      const reportResult = await generateExcelReport(finalSubmissionData, submissionId, reportsDir);
-      reportPath = reportResult.reportPath;
+      // Now the function saves to GridFS instead of filesystem
+      const reportResult = await generateExcelReport(finalSubmissionData, submissionId);
+      fileId = reportResult.fileId;
+      filename = reportResult.filename;
       qualificationData = reportResult.qualificationData;
-      console.log(`Excel report generated at ${reportPath}`);
+      console.log(`Excel report stored in GridFS with ID: ${fileId}`);
       if (qualificationData && qualificationData.qualifyingQuarters) {
         console.log(`Qualifying quarters: ${qualificationData.qualifyingQuarters.join(', ') || 'None'}`);
       }
@@ -147,7 +149,7 @@ app.post('/webhook', upload.any(), async (req, res) => {
         userId = submissionId;
       }
       
-      // Create a new submission document with qualification data
+      // Create a new submission document with GridFS reference
       const submission = new Submission({
         submissionId: submissionId,
         userId: userId,
@@ -156,8 +158,9 @@ app.post('/webhook', upload.any(), async (req, res) => {
         originalData: parsedData,
         receivedFiles: receivedFiles,
         report: {
-          generated: !!reportPath,
-          path: reportPath,
+          generated: !!fileId,
+          fileId: fileId,
+          filename: filename,
           qualificationData: qualificationData
         }
       });
@@ -184,7 +187,7 @@ app.post('/webhook', upload.any(), async (req, res) => {
       success: true,
       message: 'Webhook notification received and processed successfully',
       submissionId: submissionId,
-      reportGenerated: !!reportPath,
+      reportGenerated: !!fileId,
       mongoDbStorage: mongoResult.success,
       mongoDetails: mongoResult,
       // Include qualifying quarters information if available
@@ -277,7 +280,8 @@ app.get('/', (req, res) => {
       fileStorage: true,
       excelReports: true,
       mongoDbStorage: true,
-      qualificationData: true // Adding this feature flag to indicate support for qualification data
+      qualificationData: true,
+      gridFS: true // Added new feature to indicate GridFS support
     }
   });
 });
@@ -288,5 +292,5 @@ app.listen(PORT, () => {
   console.log(`Webhook endpoint: http://localhost:${PORT}/webhook`);
   console.log(`Submissions will be saved to: ${submissionsDir}`);
   console.log(`Uploaded files will be saved to: ${uploadsDir}`);
-  console.log(`Excel reports will be saved to: ${reportsDir}`);
+  console.log(`Excel reports will be stored in MongoDB GridFS`);
 });

@@ -96,10 +96,11 @@ const submissionSchema = new mongoose.Schema({
     size: Number,
     mimetype: String
   }],
-  // Store report information with qualification data
+  // Store report information with GridFS reference
   report: {
     generated: Boolean,
-    path: String,
+    fileId: mongoose.Schema.Types.ObjectId, // Reference to GridFS file
+    filename: String,                       // Filename in GridFS
     qualificationData: {
       qualifyingQuarters: [String], // Array of quarters that qualify (e.g., ['Q1 2021', 'Q2 2021'])
       quarterAnalysis: [{
