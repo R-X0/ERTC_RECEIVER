@@ -339,6 +339,9 @@ async function generateExcelReport(submissionData, submissionId) {
         }
       });
       
+      // Store the file ID when creating the stream
+      const fileId = uploadStream.id;
+      
       bufferStream.pipe(uploadStream);
       
       uploadStream.on('error', (error) => {
@@ -346,12 +349,12 @@ async function generateExcelReport(submissionData, submissionId) {
         reject(error);
       });
       
-      uploadStream.on('finish', (file) => {
-        console.log(`Excel report saved to GridFS with ID: ${file._id}`);
+      uploadStream.on('finish', () => {
+        console.log(`Excel report saved to GridFS with ID: ${fileId}`);
         
         // Return both the file ID and qualification data
         resolve({
-          fileId: file._id,
+          fileId: fileId,
           filename,
           qualificationData: {
             qualifyingQuarters,
