@@ -89,12 +89,20 @@ const submissionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     required: true
   },
-  // Store metadata about files
+  // Store metadata about local files (legacy support)
   receivedFiles: [{
     originalName: String,
     savedPath: String,
     size: Number,
     mimetype: String
+  }],
+  // NEW: Store references to files in GridFS
+  gridFSFiles: [{
+    originalName: String,
+    fileId: mongoose.Schema.Types.ObjectId,
+    size: Number,
+    mimetype: String,
+    category: String // e.g., 'quarterly_941_forms', 'wages_by_period'
   }],
   // Store report information with GridFS reference
   report: {

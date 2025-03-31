@@ -6,10 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const { generateExcelReport } = require('./excel-generator');
 const { connectToDatabase, Submission } = require('./db-connection');
+const mongoose = require('mongoose');
+const { GridFSBucket } = require('mongodb');
+const stream = require('stream');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Create directories for storing files and reports
+// Create directories for storing files and reports (temporary storage)
 const submissionsDir = path.join(__dirname, 'submissions');
 const uploadsDir = path.join(__dirname, 'uploads');
 
@@ -20,7 +23,7 @@ const uploadsDir = path.join(__dirname, 'uploads');
   }
 });
 
-// Configure multer for file storage
+// Configure multer for temporary file storage before moving to GridFS
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Create a directory for this submission
@@ -52,6 +55,38 @@ connectToDatabase().then(connected => {
   }
 });
 
+// Function to store a file in GridFS
+async function storeFileInGridFS(filePath, fileName, mimeType, metadata) {
+  return new Promise((resolve, reject) => {
+    const bucket = new GridFSBucket(mongoose.connection.db, {
+      bucketName: 'clientFiles'
+    });
+
+    const fileStream = fs.createReadStream(filePath);
+    const uploadStream = bucket.openUploadStream(fileName, {
+      metadata: {
+        ...metadata,
+        contentType: mimeType,
+        uploadedAt: new Date()
+      }
+    });
+
+    const fileId = uploadStream.id;
+
+    fileStream.pipe(uploadStream);
+
+    uploadStream.on('error', (error) => {
+      console.error('Error uploading file to GridFS:', error);
+      reject(error);
+    });
+
+    uploadStream.on('finish', () => {
+      console.log(`File ${fileName} saved to GridFS with ID: ${fileId}`);
+      resolve(fileId);
+    });
+  });
+}
+
 // Webhook endpoint
 app.post('/webhook', upload.any(), async (req, res) => {
   try {
@@ -77,19 +112,59 @@ app.post('/webhook', upload.any(), async (req, res) => {
       parsedData = req.body;
     }
     
-    // Handle received files
+    // Handle received files and store them in GridFS
     const receivedFiles = [];
+    const gridFSFiles = [];
+    
     if (req.files && req.files.length > 0) {
-      console.log(`Received ${req.files.length} files:`);
-      req.files.forEach(file => {
-        console.log(`- ${file.originalname} (${file.size} bytes) saved to ${file.path}`);
-        receivedFiles.push({
-          originalName: file.originalname,
-          savedPath: file.path,
-          size: file.size,
-          mimetype: file.mimetype
-        });
-      });
+      console.log(`Received ${req.files.length} files - storing in GridFS:`);
+      
+      for (const file of req.files) {
+        try {
+          // Determine file category from the request
+          let fileCategory = 'unknown';
+          if (parsedData.formData && parsedData.formData.uploadedFiles) {
+            // Try to find the category based on file name
+            Object.entries(parsedData.formData.uploadedFiles).forEach(([category, files]) => {
+              if (files && files.some(f => f.name === file.originalname)) {
+                fileCategory = category;
+              }
+            });
+          }
+          
+          // Store file in GridFS
+          const fileId = await storeFileInGridFS(
+            file.path, 
+            file.originalname, 
+            file.mimetype, 
+            {
+              submissionId,
+              fileCategory,
+              originalSize: file.size
+            }
+          );
+          
+          // Store both local path (temporary) and GridFS info
+          receivedFiles.push({
+            originalName: file.originalname,
+            savedPath: file.path,
+            size: file.size,
+            mimetype: file.mimetype
+          });
+          
+          gridFSFiles.push({
+            originalName: file.originalname,
+            fileId: fileId,
+            size: file.size,
+            mimetype: file.mimetype,
+            category: fileCategory
+          });
+          
+          console.log(`- ${file.originalname} (${file.size} bytes) stored in GridFS with ID: ${fileId}`);
+        } catch (fileError) {
+          console.error(`Error storing file ${file.originalname} in GridFS:`, fileError);
+        }
+      }
     } else {
       console.log('No files received with this submission');
     }
@@ -149,7 +224,7 @@ app.post('/webhook', upload.any(), async (req, res) => {
         userId = submissionId;
       }
       
-      // Create a new submission document with GridFS reference
+      // Create a new submission document with GridFS references for all files
       const submission = new Submission({
         submissionId: submissionId,
         userId: userId,
@@ -157,6 +232,8 @@ app.post('/webhook', upload.any(), async (req, res) => {
         receivedAt: new Date(),
         originalData: parsedData,
         receivedFiles: receivedFiles,
+        // Add GridFS file references
+        gridFSFiles: gridFSFiles,
         report: {
           generated: !!fileId,
           fileId: fileId,
@@ -188,6 +265,7 @@ app.post('/webhook', upload.any(), async (req, res) => {
       message: 'Webhook notification received and processed successfully',
       submissionId: submissionId,
       reportGenerated: !!fileId,
+      filesStoredInGridFS: gridFSFiles.length,
       mongoDbStorage: mongoResult.success,
       mongoDetails: mongoResult,
       // Include qualifying quarters information if available
@@ -217,7 +295,7 @@ app.get('/submissions/:userEmail', async (req, res) => {
     
     // Find all submissions for this user, now including qualification data
     const submissions = await Submission.find({ userEmail: userEmail })
-      .select('submissionId receivedAt originalData.formData.qualifyingQuestions report.generated report.qualificationData')
+      .select('submissionId receivedAt originalData.formData.qualifyingQuestions report.generated report.qualificationData gridFSFiles')
       .sort({ receivedAt: -1 });
     
     res.status(200).json({
@@ -271,6 +349,102 @@ app.get('/submission/:submissionId', async (req, res) => {
   }
 });
 
+// Add an endpoint to download a file from GridFS
+app.get('/download/file/:fileId', async (req, res) => {
+  try {
+    const fileId = new mongoose.Types.ObjectId(req.params.fileId);
+    const bucket = new GridFSBucket(mongoose.connection.db, {
+      bucketName: 'clientFiles'
+    });
+    
+    // First, get the file info to set the correct headers
+    const files = await bucket.find({ _id: fileId }).toArray();
+    
+    if (!files || files.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'File not found'
+      });
+    }
+    
+    const file = files[0];
+    
+    // Set appropriate headers
+    res.set('Content-Type', file.metadata?.contentType || 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename="${file.filename}"`);
+    
+    // Stream the file from GridFS to the response
+    const downloadStream = bucket.openDownloadStream(fileId);
+    downloadStream.pipe(res);
+    
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming file from GridFS:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Error downloading file',
+          error: error.message
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error downloading file',
+      error: error.message
+    });
+  }
+});
+
+// Add an endpoint to download Excel report from GridFS
+app.get('/download/report/:fileId', async (req, res) => {
+  try {
+    const fileId = new mongoose.Types.ObjectId(req.params.fileId);
+    const bucket = new GridFSBucket(mongoose.connection.db, {
+      bucketName: 'excelReports'
+    });
+    
+    // First, get the file info to set the correct headers
+    const files = await bucket.find({ _id: fileId }).toArray();
+    
+    if (!files || files.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found'
+      });
+    }
+    
+    const file = files[0];
+    
+    // Set appropriate headers
+    res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.set('Content-Disposition', `attachment; filename="${file.filename}"`);
+    
+    // Stream the file from GridFS to the response
+    const downloadStream = bucket.openDownloadStream(fileId);
+    downloadStream.pipe(res);
+    
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming report from GridFS:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Error downloading report',
+          error: error.message
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error downloading report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error downloading report',
+      error: error.message
+    });
+  }
+});
+
 // Simple health check endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
@@ -281,7 +455,8 @@ app.get('/', (req, res) => {
       excelReports: true,
       mongoDbStorage: true,
       qualificationData: true,
-      gridFS: true // Added new feature to indicate GridFS support
+      gridFS: true,
+      fileDownloads: true
     }
   });
 });
@@ -290,7 +465,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Webhook receiver server running on port ${PORT}`);
   console.log(`Webhook endpoint: http://localhost:${PORT}/webhook`);
-  console.log(`Submissions will be saved to: ${submissionsDir}`);
-  console.log(`Uploaded files will be saved to: ${uploadsDir}`);
-  console.log(`Excel reports will be stored in MongoDB GridFS`);
+  console.log(`Files and reports are stored in MongoDB GridFS`);
 });
